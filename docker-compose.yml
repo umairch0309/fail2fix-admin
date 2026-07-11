@@ -1,0 +1,11 @@
+name: fail2fix-admin
+
+services:
+  nextjs:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fail2fix-admin-frontend
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
