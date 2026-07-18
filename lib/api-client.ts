@@ -1,5 +1,11 @@
 import { API_URL } from "@/lib/constants";
 
+/** Browser: same-origin /api proxy. Server: absolute backend URL. */
+function apiBase(): string {
+  if (typeof window !== "undefined") return "";
+  return API_URL.replace(/\/$/, "");
+}
+
 type ApiEnvelope<T> = {
   success?: boolean;
   data?: T;
@@ -63,7 +69,7 @@ export async function apiFetch<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await fetch(`${apiBase()}${path}`, {
     credentials: "include",
     ...options,
     headers: {
@@ -116,7 +122,7 @@ export async function apiPostWithMessage<T>(
   path: string,
   body?: unknown,
 ): Promise<{ data: T; message?: string }> {
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await fetch(`${apiBase()}${path}`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },

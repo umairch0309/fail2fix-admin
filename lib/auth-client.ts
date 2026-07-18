@@ -3,34 +3,27 @@ import { adminClient } from "better-auth/client/plugins";
 import { API_URL } from "./constants";
 
 /**
- * Better Auth Client for Admin Panel
- * Uses admin-specific auth endpoint with different cookie prefix
- * This allows admin and customer to be logged in simultaneously
+ * Same-origin auth base in the browser (via app/api/[...path] proxy → backend).
+ * Server components still talk to the absolute API URL when needed.
  *
  * Cookie: admin-auth.session_token
  * Endpoint: /api/admin-auth/*
- *
- * Usage:
- * - authClient.signIn.email({ email, password })
- * - authClient.signOut()
- * - authClient.useSession()
- * - authClient.admin.listUsers() - List all users (admin only)
- * - authClient.admin.setRole() - Change user role (admin only)
- *
- * Note: Admin auth uses simple email/password only (no OTP, no password reset)
  */
+const authBaseURL =
+  typeof window !== "undefined"
+    ? `${window.location.origin}/api/admin-auth`
+    : `${API_URL}/api/admin-auth`;
+
 export const authClient = createAuthClient({
-  baseURL: `${API_URL}/api/admin-auth`, // Admin-specific auth endpoint
+  baseURL: authBaseURL,
   fetchOptions: {
-    credentials: 'include', // Required for cross-origin cookie handling
+    credentials: "include",
   },
   plugins: [adminClient()],
 });
 
-// Export individual methods for convenience
 export const { signIn, signOut, useSession, admin } = authClient;
 
-// Extended user type with role (returned from backend)
 export interface UserWithRole {
   id: string;
   email: string;
@@ -42,7 +35,6 @@ export interface UserWithRole {
   updatedAt: Date;
 }
 
-// Export types using Better Auth's $Infer property
 export type Session = typeof authClient.$Infer.Session;
 
 export default authClient;

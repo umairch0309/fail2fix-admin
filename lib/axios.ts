@@ -11,12 +11,12 @@ import { API_URL } from "./constants";
  */
 
 export const api = axios.create({
-  baseURL: API_URL,
+  // Browser uses same-origin /api proxy; SSR uses absolute backend URL
+  baseURL: typeof window !== "undefined" ? "" : API_URL,
   timeout: 30000,
   headers: {
     "Content-Type": "application/json",
   },
-  // IMPORTANT: Send cookies with cross-origin requests
   withCredentials: true,
 });
 
