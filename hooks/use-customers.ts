@@ -6,6 +6,7 @@ import { queryKeys } from "@/lib/query-keys";
 import {
   apiDelete,
   apiGet,
+  apiPost,
   apiPostWithMessage,
   apiPut,
   isPaginatedResult,
