@@ -300,9 +300,10 @@ export default function EditQuotePage() {
               "Save Changes"
             )}
           </Button>
-          {/* Show Send button only for: draft, rejected, expired */}
-          {/* Hide for: sent (already sent), paid (handled by redirect) */}
-          {quote.status !== "sent" && (
+          {/* Save & Send only for draft / rejected / expired — never after deposit */}
+          {(quote.status === "draft" ||
+            quote.status === "rejected" ||
+            quote.status === "expired") && (
             <CustomButton
               onClick={handleSaveAndSend}
               disabled={!isValid || isSaving || isSending}

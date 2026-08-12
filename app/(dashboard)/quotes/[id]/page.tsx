@@ -301,8 +301,15 @@ export default function QuoteDetailPage() {
 
   // Calculate deposit and balance amounts
   const total = parseFloat(quote?.total || "0");
-  const depositAmount = total * 0.10;
-  const balanceAmount = total * 0.90;
+  const depositAmount = quote?.depositAmount
+    ? parseFloat(quote.depositAmount)
+    : total * 0.1;
+  const balanceAmount =
+    quote?.status === "deposit_paid" || quote?.status === "paid"
+      ? Math.max(0, total - depositAmount)
+      : quote?.balanceAmount
+        ? parseFloat(quote.balanceAmount)
+        : total * 0.9;
 
   if (isLoading) {
     return (
@@ -334,8 +341,8 @@ export default function QuoteDetailPage() {
   }
 
   const statusConfig = quoteStatusConfig[quote.status];
-  // Non-paid quotes can be edited and deleted
-  const canEdit = quote.status !== "paid" && quote.status !== "deposit_paid";
+  // Fully paid quotes cannot be edited; deposit-paid can (extra work / price update)
+  const canEdit = quote.status !== "paid";
   const canSend = quote.status === "draft";
   const canResend = quote.status === "rejected" || quote.status === "expired";
   const canDelete = quote.status !== "paid" && quote.status !== "deposit_paid";
@@ -667,14 +674,14 @@ export default function QuoteDetailPage() {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-[#6B7280] flex items-center gap-2">
                         <CheckCircle className="w-4 h-4 text-green-500" />
-                        Deposit (10%)
+                        Deposit paid
                       </span>
                       <span className="font-medium text-green-600">£{depositAmount.toFixed(2)}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-[#6B7280] flex items-center gap-2">
                         <span className="w-4 h-4 rounded-full border-2 border-[#D1D5DB]" />
-                        Balance (90%)
+                        Remaining balance
                       </span>
                       <span className="font-medium text-[#6B7280]">£{balanceAmount.toFixed(2)}</span>
                     </div>
