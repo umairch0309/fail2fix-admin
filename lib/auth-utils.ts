@@ -92,7 +92,15 @@ export const getSession = cache(async (): Promise<Session | null> => {
  */
 export async function requireAuth(redirectTo = "/login"): Promise<Session> {
   const session = await getSession();
-  if (!session) redirect(redirectTo);
+  if (!session) {
+    // forceLogin tells the proxy to clear a stale session cookie and stop
+    // /login ↔ /dashboard redirect loops (optimistic cookie vs invalid session).
+    const url =
+      redirectTo === "/login" || redirectTo.startsWith("/login?")
+        ? "/login?forceLogin=1"
+        : redirectTo;
+    redirect(url);
+  }
   return session;
 }
 
