@@ -143,11 +143,12 @@ export function useBanCustomer() {
       reason?: string;
     }): Promise<Customer> =>
       apiPost<Customer>(`/api/customers/${customerId}/ban`, { reason }),
-    onSuccess: (_, variables) => {
+    onSuccess: (customer, variables) => {
+      queryClient.setQueryData(
+        queryKeys.customers.detail(variables.customerId),
+        customer,
+      );
       queryClient.invalidateQueries({ queryKey: queryKeys.customers.all });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.customers.detail(variables.customerId),
-      });
       toast.success("Customer banned successfully");
     },
     onError: (error) => {
@@ -162,11 +163,9 @@ export function useUnbanCustomer() {
   return useMutation({
     mutationFn: async (customerId: string): Promise<Customer> =>
       apiPost<Customer>(`/api/customers/${customerId}/unban`),
-    onSuccess: (_, customerId) => {
+    onSuccess: (customer, customerId) => {
+      queryClient.setQueryData(queryKeys.customers.detail(customerId), customer);
       queryClient.invalidateQueries({ queryKey: queryKeys.customers.all });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.customers.detail(customerId),
-      });
       toast.success("Customer unbanned successfully");
     },
     onError: (error) => {

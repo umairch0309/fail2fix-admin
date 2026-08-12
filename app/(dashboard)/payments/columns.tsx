@@ -1,7 +1,7 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal, Eye } from "lucide-react";
+import { Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/user-avatar";
 import {
@@ -109,10 +109,10 @@ export const columns: ColumnDef<Payment>[] = [
   },
   {
     id: "actions",
-    header: "Action",
+    header: () => <div className="text-center w-full">Action</div>,
     cell: ({ row }) => {
       return (
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center justify-center">
           <Link href={`/quotes/${row.original.quoteId}`}>
             <Button
               variant="outline"
@@ -123,13 +123,6 @@ export const columns: ColumnDef<Payment>[] = [
               View
             </Button>
           </Link>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8 text-[#97999D] border-[#EAEAEA] shadow-none"
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
         </div>
       );
     },

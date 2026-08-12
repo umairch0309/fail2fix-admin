@@ -19,7 +19,6 @@ export default function CustomersPage() {
   const { setHeader, setNewCustomerSheetOpen } = useDashboardStore();
   const [activeTab, setActiveTab] = useState("all");
   const [searchValue, setSearchValue] = useState("");
-  const [activeFilters, setActiveFilters] = useState<Record<string, string[]>>({});
 
   const { page, limit, setPage } = useListPagination();
   const { data: customersResult, isLoading, error } = useCustomers({
@@ -42,75 +41,16 @@ export default function CustomersPage() {
     });
   }, [setHeader, setNewCustomerSheetOpen]);
 
-  // Generate dynamic filters based on data
-  const dynamicFilters = useMemo(() => {
-    // Get unique locations (cities) from data
-    const cities = [...new Set(customers.map((c) => c.city).filter(Boolean))] as string[];
-    const states = [...new Set(customers.map((c) => c.state).filter(Boolean))] as string[];
-
-    const filters = [];
-
-    if (cities.length > 0) {
-      filters.push({
-        key: "city",
-        label: "City",
-        options: cities.map((city) => ({
-          value: city,
-          label: city,
-        })),
-      });
-    }
-
-    if (states.length > 0) {
-      filters.push({
-        key: "state",
-        label: "State",
-        options: states.map((state) => ({
-          value: state,
-          label: state,
-        })),
-      });
-    }
-
-    return filters;
-  }, [customers]);
-
-  const handleFilterChange = (key: string, values: string[]) => {
-    setActiveFilters((prev) => ({
-      ...prev,
-      [key]: values,
-    }));
-  };
-
-  // Filter data based on active tab and filters
   const filteredData = useMemo(() => {
-    let data = customers;
-
-    // Tab filter
     if (activeTab === "active") {
-      data = data.filter((customer) => customer.banned !== true);
-    } else if (activeTab === "banned") {
-      data = data.filter((customer) => customer.banned === true);
+      return customers.filter((customer) => customer.banned !== true);
     }
-
-    // City filter
-    if (activeFilters.city?.length) {
-      data = data.filter((customer) =>
-        customer.city && activeFilters.city.includes(customer.city)
-      );
+    if (activeTab === "banned") {
+      return customers.filter((customer) => customer.banned === true);
     }
+    return customers;
+  }, [activeTab, customers]);
 
-    // State filter
-    if (activeFilters.state?.length) {
-      data = data.filter((customer) =>
-        customer.state && activeFilters.state.includes(customer.state)
-      );
-    }
-
-    return data;
-  }, [activeTab, activeFilters, customers]);
-
-  // Search filter
   const searchFilteredData = useMemo(() => {
     if (!searchValue) return filteredData;
     const search = searchValue.toLowerCase();
@@ -118,7 +58,7 @@ export default function CustomersPage() {
       (customer) =>
         customer.name.toLowerCase().includes(search) ||
         customer.email.toLowerCase().includes(search) ||
-        customer.phone?.toLowerCase().includes(search)
+        customer.phone?.toLowerCase().includes(search),
     );
   }, [filteredData, searchValue]);
 
@@ -148,9 +88,6 @@ export default function CustomersPage() {
         onSearchChange={setSearchValue}
         searchPlaceholder="Search customers..."
         layoutId="activeCustomerTab"
-        filters={dynamicFilters}
-        activeFilters={activeFilters}
-        onFilterChange={handleFilterChange}
       />
       <DataTable
         columns={columns}
