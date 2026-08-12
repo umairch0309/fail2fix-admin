@@ -1,6 +1,6 @@
 import React from "react";
 import { cn } from "@/lib/utils";
-import { requestStatusConfig } from "@/types/request";
+import { getRequestStatusConfig } from "@/types/request";
 import type { QuoteRequestPayload } from "@/types/websocket";
 import { Car, MapPin, User, FileText } from "lucide-react";
 
@@ -21,7 +21,7 @@ const QuoteRequestCard: React.FC<QuoteRequestCardProps> = ({
   className,
   ...props
 }) => {
-  const statusConfig = requestStatusConfig[quoteRequest.status];
+  const statusConfig = getRequestStatusConfig(quoteRequest.status);
 
   return (
     <div className="flex justify-start">

@@ -202,7 +202,7 @@ export const useWebSocketStore = create<WebSocketStore>((set, get) => ({
                 playSound: false,
                 tag: `chat-${chatId}`,
                 onClick: () => {
-                  window.location.href = `/chats?id=${chatId}`;
+                  window.location.href = `/chats/${chatId}`;
                 },
               });
             }
@@ -261,7 +261,7 @@ export const useWebSocketStore = create<WebSocketStore>((set, get) => ({
               playSound: false,
               tag: `quote-${quotePayload.vrm}`,
               onClick: () => {
-                window.location.href = `/chats?id=${chatId}`;
+                window.location.href = `/chats/${chatId}`;
               },
             });
           }

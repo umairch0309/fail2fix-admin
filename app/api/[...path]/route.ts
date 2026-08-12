@@ -39,7 +39,10 @@ async function proxyToBackend(request: Request, context: RouteContext) {
 
     headers.set("origin", incoming.origin);
     headers.set("x-forwarded-host", incoming.host);
-    headers.set("x-forwarded-proto", "https");
+    headers.set(
+      "x-forwarded-proto",
+      incoming.protocol.replace(":", "") || "https",
+    );
 
     const init: RequestInit = {
       method: request.method,

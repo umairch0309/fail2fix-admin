@@ -94,9 +94,25 @@ export default function ChatConversationPage() {
   const chatId = params.id as string;
   const queryClient = useQueryClient();
   const setHeader = useDashboardStore((state) => state.setHeader);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const mobileScrollRef = useRef<HTMLDivElement>(null);
+  const desktopScrollRef = useRef<HTMLDivElement>(null);
+  const mobileEndRef = useRef<HTMLDivElement>(null);
+  const desktopEndRef = useRef<HTMLDivElement>(null);
   const isInitialLoad = useRef(true);
+
+  const isDesktopViewport = () =>
+    typeof window !== "undefined" &&
+    window.matchMedia("(min-width: 768px)").matches;
+
+  const getActiveScrollEl = () =>
+    isDesktopViewport() ? desktopScrollRef.current : mobileScrollRef.current;
+
+  const scrollActiveEndIntoView = (behavior: ScrollBehavior) => {
+    const end = isDesktopViewport()
+      ? desktopEndRef.current
+      : mobileEndRef.current;
+    end?.scrollIntoView({ behavior });
+  };
 
   // Sheet state
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
@@ -152,6 +168,7 @@ export default function ChatConversationPage() {
       senderId: msg.senderId,
       content: msg.content,
       timestamp: new Date(msg.createdAt).getTime(),
+      senderRole: msg.senderRole as string | null | undefined,
       _type: msg.messageType as "chat" | "quote_request" | undefined,
       _quoteRequest: msg.messageType === "quote_request" && msg.metadata
         ? msg.metadata as typeof realtimeMessages[0]["_quoteRequest"]
@@ -169,9 +186,9 @@ export default function ChatConversationPage() {
     return [...apiFormatted, ...newRealtimeMessages];
   }, [data?.pages, realtimeMessages]);
 
-  // Handle scroll to load more
+  // Handle scroll to load more (use visible pane only)
   const handleScroll = useCallback(() => {
-    const container = scrollContainerRef.current;
+    const container = getActiveScrollEl();
     if (!container || isFetchingNextPage || !hasNextPage) return;
 
     if (container.scrollTop < 100) {
@@ -179,9 +196,10 @@ export default function ChatConversationPage() {
 
       fetchNextPage().then(() => {
         requestAnimationFrame(() => {
-          if (scrollContainerRef.current) {
-            const newScrollHeight = scrollContainerRef.current.scrollHeight;
-            scrollContainerRef.current.scrollTop = newScrollHeight - prevScrollHeight;
+          const active = getActiveScrollEl();
+          if (active) {
+            const newScrollHeight = active.scrollHeight;
+            active.scrollTop = newScrollHeight - prevScrollHeight;
           }
         });
       });
@@ -198,6 +216,7 @@ export default function ChatConversationPage() {
 
     // Set active chat for filtering messages
     setActiveChat(chatId);
+    isInitialLoad.current = true;
 
     // Mark messages as read
     wsMarkAsRead(chatId);
@@ -211,16 +230,15 @@ export default function ChatConversationPage() {
   // Scroll to bottom on initial load
   useEffect(() => {
     if (isInitialLoad.current && messages.length > 0 && !isLoading) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
+      scrollActiveEndIntoView("instant");
       isInitialLoad.current = false;
     }
-  }, [messages, isLoading]);
+  }, [messages, isLoading, chatId]);
 
   // Scroll to bottom on new messages and refetch chats list
   useEffect(() => {
     if (!isInitialLoad.current && realtimeMessages.length > 0) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      // Refetch chats to update sidebar with new lastMessageAt
+      scrollActiveEndIntoView("smooth");
       queryClient.invalidateQueries({ queryKey: queryKeys.chats.all });
     }
   }, [realtimeMessages, queryClient]);
@@ -282,7 +300,7 @@ export default function ChatConversationPage() {
 
         {/* Mobile Chat Area */}
         <div
-          ref={scrollContainerRef}
+          ref={mobileScrollRef}
           onScroll={handleScroll}
           className="bg-[#F5F5F5] flex-1 px-4 py-4 flex flex-col overflow-y-auto"
         >
@@ -348,7 +366,11 @@ export default function ChatConversationPage() {
                       <Chatbox
                         message={msg.content}
                         time={formatTime(msg.timestamp)}
-                        isOwn={msg.senderId === userId}
+                        isOwn={
+                          "senderRole" in msg && msg.senderRole
+                            ? msg.senderRole === "admin"
+                            : msg.senderId === userId
+                        }
                         showTime={showTime}
                         isGrouped={isGrouped}
                       />
@@ -356,13 +378,18 @@ export default function ChatConversationPage() {
                   );
                 })
               )}
-              <div ref={messagesEndRef} />
+              <div ref={mobileEndRef} />
             </div>
           </div>
         </div>
 
         {/* Mobile Chat Input */}
-        <div className="bg-[#F5F5F5] p-4 border-t border-[#EAEAEA]">
+        <div className="bg-[#F5F5F5] p-4 border-t border-[#EAEAEA] space-y-2">
+          {!isConnected && (
+            <p className="text-center text-xs text-[#813500] bg-[#FFF8F3] border border-[#FFE4D2] rounded-lg px-3 py-2">
+              Reconnecting to chat… Messages can&apos;t be sent until you&apos;re back online.
+            </p>
+          )}
           <Chatinput onSend={handleSend} onTyping={handleTyping} disabled={!isConnected} />
         </div>
       </div>
@@ -418,7 +445,7 @@ export default function ChatConversationPage() {
 
           {/* Chat Messages Area */}
           <div
-            ref={scrollContainerRef}
+            ref={desktopScrollRef}
             onScroll={handleScroll}
             className="bg-[#F5F5F5] px-6 py-4 flex flex-col flex-1 overflow-y-auto"
           >
@@ -484,7 +511,11 @@ export default function ChatConversationPage() {
                         <Chatbox
                           message={msg.content}
                           time={formatTime(msg.timestamp)}
-                          isOwn={msg.senderId === userId}
+                          isOwn={
+                            "senderRole" in msg && msg.senderRole
+                              ? msg.senderRole === "admin"
+                              : msg.senderId === userId
+                          }
                           showTime={showTime}
                           isGrouped={isGrouped}
                         />
@@ -492,13 +523,18 @@ export default function ChatConversationPage() {
                     );
                   })
                 )}
-                <div ref={messagesEndRef} />
+                <div ref={desktopEndRef} />
               </div>
             </div>
           </div>
 
           {/* Chat Input */}
-          <div className="bg-[#F5F5F5] p-4 border-t border-[#EAEAEA]">
+          <div className="bg-[#F5F5F5] p-4 border-t border-[#EAEAEA] space-y-2">
+            {!isConnected && (
+              <p className="text-center text-xs text-[#813500] bg-[#FFF8F3] border border-[#FFE4D2] rounded-lg px-3 py-2">
+                Reconnecting to chat… Messages can&apos;t be sent until you&apos;re back online.
+              </p>
+            )}
             <Chatinput onSend={handleSend} onTyping={handleTyping} disabled={!isConnected} />
           </div>
         </div>

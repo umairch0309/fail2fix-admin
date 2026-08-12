@@ -36,6 +36,7 @@ export function useChatMessages(chatId: string | null) {
     },
     enabled: !!chatId,
     staleTime: 30 * 1000,
+    refetchOnMount: "always",
   });
 }
 

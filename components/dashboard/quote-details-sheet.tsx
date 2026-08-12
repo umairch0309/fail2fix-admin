@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/custombutton";
 import { useRequest } from "@/hooks/use-requests";
-import { requestStatusConfig } from "@/types/request";
+import { getRequestStatusConfig } from "@/types/request";
 import { Copy, Check, Car, Wrench } from "lucide-react";
 import Orders from "@/public/icons/Orders";
 import { FilePreviewModal, FileThumbnail } from "@/components/ui/file-preview-modal";
@@ -103,16 +103,21 @@ const QuoteDetailsSheet: React.FC<QuoteDetailsSheetProps> = ({
               {/* Status Badge - Prominent at top */}
               <div className="flex items-center justify-between bg-white border border-[#EDEDED] rounded-lg px-4 h-14">
                 <span className="text-sm font-medium text-[#7F7F7F]">Status</span>
-                <span
-                  className="px-3 py-1.5 rounded-full text-xs font-semibold"
-                  style={{
-                    color: requestStatusConfig[request.status].textColor,
-                    backgroundColor: requestStatusConfig[request.status].bgColor,
-                    border: `1px solid ${requestStatusConfig[request.status].borderColor}`,
-                  }}
-                >
-                  {requestStatusConfig[request.status].label}
-                </span>
+                {(() => {
+                  const statusConfig = getRequestStatusConfig(request.status);
+                  return (
+                    <span
+                      className="px-3 py-1.5 rounded-full text-xs font-semibold"
+                      style={{
+                        color: statusConfig.textColor,
+                        backgroundColor: statusConfig.bgColor,
+                        border: `1px solid ${statusConfig.borderColor}`,
+                      }}
+                    >
+                      {statusConfig.label}
+                    </span>
+                  );
+                })()}
               </div>
 
               {/* Contact Information Section */}
