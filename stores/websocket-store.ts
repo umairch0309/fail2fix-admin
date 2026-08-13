@@ -29,6 +29,8 @@ export type WebSocketState = {
   // Presence - is the customer online?
   isOtherPartyOnline: boolean;
   otherPartyRole: "admin" | "customer" | null;
+  /** chatId -> userId -> role for users currently connected */
+  onlineUsersByChat: Record<string, Record<string, "admin" | "customer">>;
 
   // Typing indicator
   isOtherPartyTyping: boolean;
@@ -111,6 +113,7 @@ export const useWebSocketStore = create<WebSocketStore>((set, get) => ({
   isOtherPartyOnline: false,
   otherPartyRole: null,
   isOtherPartyTyping: false,
+  onlineUsersByChat: {},
 
   // Connect to WebSocket
   connect: () => {
@@ -175,21 +178,42 @@ export const useWebSocketStore = create<WebSocketStore>((set, get) => ({
             connectionId: payload.connectionId,
             userId: payload.userId ?? null,
           });
+          const { activeChatId } = get();
+          if (activeChatId && ws.readyState === WebSocket.OPEN) {
+            ws.send(
+              JSON.stringify({
+                type: "presence_request",
+                topic: `chat:${activeChatId}`,
+                timestamp: Date.now(),
+              }),
+            );
+          }
         }
 
         // Handle presence updates
         if (message.type === "presence" && message.topic?.startsWith("chat:")) {
           const presencePayload = message.payload as PresencePayload;
-          const { userId, activeChatId } = get();
+          const { userId, activeChatId, onlineUsersByChat } = get();
           const chatId = message.topic.replace("chat:", "");
+          if (presencePayload.userId === userId) return;
 
-          // Only care about other party's presence in active chat
-          if (presencePayload.userId !== userId && chatId === activeChatId) {
-            set({
-              isOtherPartyOnline: presencePayload.isOnline,
-              otherPartyRole: presencePayload.userRole,
-            });
+          const current = { ...(onlineUsersByChat[chatId] || {}) };
+          if (presencePayload.isOnline) {
+            current[presencePayload.userId] = presencePayload.userRole;
+          } else {
+            delete current[presencePayload.userId];
           }
+
+          const customerOnline = Object.values(current).includes("customer");
+          set({
+            onlineUsersByChat: { ...onlineUsersByChat, [chatId]: current },
+            ...(chatId === activeChatId
+              ? {
+                  isOtherPartyOnline: customerOnline,
+                  otherPartyRole: customerOnline ? ("customer" as const) : null,
+                }
+              : {}),
+          });
         }
 
         // Handle typing indicators
@@ -236,6 +260,23 @@ export const useWebSocketStore = create<WebSocketStore>((set, get) => ({
           // If message is for active chat, add to messages
           if (chatId === activeChatId) {
             set({ messages: [...messages, chatPayload] });
+          }
+
+          // A live message means that user is connected
+          if (chatPayload.senderId && chatPayload.senderId !== userId) {
+            const { onlineUsersByChat: presenceMap, activeChatId: currentChat } = get();
+            const users = { ...(presenceMap[chatId] || {}) };
+            users[chatPayload.senderId] = "customer";
+            const customerOnline = Object.values(users).includes("customer");
+            set({
+              onlineUsersByChat: { ...presenceMap, [chatId]: users },
+              ...(chatId === currentChat
+                ? {
+                    isOtherPartyOnline: customerOnline,
+                    otherPartyRole: "customer" as const,
+                  }
+                : {}),
+            });
           }
 
           // If message is from customer (not us), increment unread
@@ -406,13 +447,26 @@ export const useWebSocketStore = create<WebSocketStore>((set, get) => ({
   // Note: Admin is already subscribed to all chats by the backend on connection,
   // so we don't need to send subscribe/unsubscribe messages here
   setActiveChat: (chatId: string | null) => {
-    // Clear messages and presence state for the new active chat
+    const online = chatId ? get().onlineUsersByChat[chatId] || {} : {};
+    const customerOnline = Object.values(online).includes("customer");
     set({
       activeChatId: chatId,
       messages: [],
-      isOtherPartyOnline: false,
+      isOtherPartyOnline: customerOnline,
+      otherPartyRole: customerOnline ? "customer" : null,
       isOtherPartyTyping: false,
     });
+
+    const { socket } = get();
+    if (chatId && socket?.readyState === WebSocket.OPEN) {
+      socket.send(
+        JSON.stringify({
+          type: "presence_request",
+          topic: `chat:${chatId}`,
+          timestamp: Date.now(),
+        }),
+      );
+    }
   },
 
   // Subscribe to a chat topic
