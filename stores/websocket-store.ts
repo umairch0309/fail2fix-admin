@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { toast } from "@/components/ui/sonner";
-import { WS_URL } from "@/lib/constants";
+import { buildAuthenticatedWsUrl, fetchWsTicket } from "@/lib/ws-ticket";
 import { showBrowserNotification } from "@/lib/notification-sound";
 import type { WSMessage, ChatPayload, ConnectionPayload, PresencePayload, TypingPayload, QuoteRequestPayload, NotificationPayload } from "@/types/websocket";
 
@@ -63,6 +63,37 @@ export type WebSocketStore = WebSocketState & WebSocketActions;
 
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let typingTimeout: ReturnType<typeof setTimeout> | null = null;
+let allowReconnect = true;
+let connectInFlight = false;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
+const BASE_RECONNECT_MS = 3000;
+
+function clearReconnectTimer() {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+}
+
+function scheduleReconnect(connect: () => void) {
+  if (!allowReconnect) return;
+  if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+    console.warn(
+      "[WS] Giving up reconnect after",
+      MAX_RECONNECT_ATTEMPTS,
+      "attempts",
+    );
+    return;
+  }
+  if (reconnectTimer) return;
+  const delay = BASE_RECONNECT_MS * Math.pow(2, reconnectAttempts);
+  reconnectAttempts += 1;
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    connect();
+  }, delay);
+}
 
 export const useWebSocketStore = create<WebSocketStore>((set, get) => ({
   // Initial state
@@ -83,27 +114,54 @@ export const useWebSocketStore = create<WebSocketStore>((set, get) => ({
 
   // Connect to WebSocket
   connect: () => {
+    void (async () => {
     const { socket } = get();
 
     // Don't connect on server or if already connected
     if (typeof window === "undefined") return;
-    if (socket?.readyState === WebSocket.OPEN) return;
+    if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) return;
+    if (connectInFlight) return;
+
+    connectInFlight = true;
+    allowReconnect = true;
+    clearReconnectTimer();
+    set({ state: "connecting" });
+
+    let ticket: string | null;
+    try {
+      ticket = await fetchWsTicket();
+    } catch (error) {
+      console.warn("[WS] Ticket request failed:", error);
+      connectInFlight = false;
+      set({ state: "error" });
+      scheduleReconnect(() => get().connect());
+      return;
+    }
+
+    if (!ticket) {
+      connectInFlight = false;
+      set({ state: "disconnected" });
+      console.warn("[WS] No session — skip connect");
+      return;
+    }
+
+    if (!allowReconnect) {
+      connectInFlight = false;
+      return;
+    }
 
     // Close existing
     if (socket) {
       socket.close();
     }
 
-    set({ state: "connecting" });
-
-    const ws = new WebSocket(WS_URL);
+    const ws = new WebSocket(buildAuthenticatedWsUrl(ticket));
+    connectInFlight = false;
 
     ws.onopen = () => {
+      reconnectAttempts = 0;
       set({ state: "connected", socket: ws });
-      if (reconnectTimer) {
-        clearTimeout(reconnectTimer);
-        reconnectTimer = null;
-      }
+      clearReconnectTimer();
     };
 
     ws.onmessage = (event) => {
@@ -313,13 +371,8 @@ export const useWebSocketStore = create<WebSocketStore>((set, get) => ({
 
     ws.onclose = () => {
       set({ state: "disconnected", socket: null, connectionId: null });
-
-      // Auto reconnect
-      if (!reconnectTimer) {
-        reconnectTimer = setTimeout(() => {
-          reconnectTimer = null;
-          get().connect();
-        }, 3000);
+      if (allowReconnect) {
+        scheduleReconnect(() => get().connect());
       }
     };
 
@@ -328,15 +381,15 @@ export const useWebSocketStore = create<WebSocketStore>((set, get) => ({
     };
 
     set({ socket: ws });
+    })();
   },
 
   // Disconnect
   disconnect: () => {
     const { socket } = get();
-    if (reconnectTimer) {
-      clearTimeout(reconnectTimer);
-      reconnectTimer = null;
-    }
+    allowReconnect = false;
+    clearReconnectTimer();
+    reconnectAttempts = 0;
     if (socket) {
       socket.close();
     }
