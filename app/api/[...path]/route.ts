@@ -37,12 +37,20 @@ async function proxyToBackend(request: Request, context: RouteContext) {
       if (value) headers.set(name, value);
     }
 
-    headers.set("origin", incoming.origin);
-    headers.set("x-forwarded-host", incoming.host);
-    headers.set(
-      "x-forwarded-proto",
-      incoming.protocol.replace(":", "") || "https",
-    );
+    // On Render, request.url is https://localhost:10000 — use public host instead
+    const proto =
+      request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ||
+      incoming.protocol.replace(":", "") ||
+      "https";
+    const host =
+      request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() ||
+      request.headers.get("host") ||
+      incoming.host;
+    const publicOrigin = `${proto}://${host}`;
+
+    headers.set("origin", publicOrigin);
+    headers.set("x-forwarded-host", host);
+    headers.set("x-forwarded-proto", proto);
 
     const init: RequestInit = {
       method: request.method,
