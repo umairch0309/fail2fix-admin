@@ -289,7 +289,7 @@ export default function EditQuotePage() {
             variant="outline"
             onClick={handleSave}
             disabled={!isValid || isSaving || isSending}
-            className="rounded-full h-10 px-5 border-[#D1D5DB] text-[#494F57] shadow-none disabled:opacity-50"
+            className="rounded-full h-10 px-5 bg-[#F97316] text-white border-[#F97316] hover:bg-[#EA580C] shadow-none disabled:opacity-50"
           >
             {isSaving && !isSending ? (
               <>
